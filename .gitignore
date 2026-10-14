@@ -1,0 +1,10 @@
+# Your own recordings, captions and settings stay on your Mac and never go in the shared copy.
+captures/
+log.json
+config.json
+# Built on each Mac by Install.command
+Process Log Menu.app/
+# The shareable zip made by make-zip.sh
+dist/
+.DS_Store
+node_modules/

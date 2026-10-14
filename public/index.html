@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Process Log</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div class="brand"><span class="brand__mark"></span>Process Log</div>
+      <div class="statusbar">
+        <span id="status" class="status"></span>
+        <button id="pause" class="chip-button" type="button">Pause logging</button>
+      </div>
+    </header>
+
+    <button id="big" class="big" type="button">
+      <span class="big__dot"></span>
+      <span class="big__text">
+        <span id="big-label" class="big__label">Capture now</span>
+        <span id="big-hint" class="big__hint"></span>
+      </span>
+    </button>
+
+    <div id="error" class="banner banner--error" hidden>
+      <span id="error-text"></span>
+      <button id="error-dismiss" class="chip-button" type="button">Dismiss</button>
+    </div>
+    <div id="save-error" class="banner banner--error" hidden>
+      <span id="save-error-text"></span>
+      <button id="save-error-dismiss" class="chip-button" type="button">Dismiss</button>
+    </div>
+    <div id="note" class="banner banner--note" hidden>
+      <span id="note-text"></span>
+      <button id="note-dismiss" class="chip-button" type="button">Dismiss</button>
+    </div>
+
+    <main id="list" class="list"></main>
+    <p id="empty" class="empty" hidden>Nothing captured yet. Press the big button, or wait for the next automatic capture.</p>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

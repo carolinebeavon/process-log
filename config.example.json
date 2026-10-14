@@ -1,0 +1,16 @@
+{
+  "port": 3002,
+  "everyMinutes": 15,
+  "seconds": 6,
+  "warmupSeconds": 1,
+  "defaultPanels": [
+    "screen1",
+    "camera"
+  ],
+  "cameraBlackAndWhite": true,
+  "cameraName": "FaceTime",
+  "soundsFolder": "",
+  "quietShortcutOn": "Process Log quiet on",
+  "quietShortcutOff": "Process Log quiet off",
+  "screenCropTop": 0
+}
