@@ -42,6 +42,7 @@ It only logs while the Mac is awake and the Terminal window is open.
 - **Every 15 minutes** it records about 6 seconds of both screens and the camera (no sound), silently: no banner, no sound, and the menu-bar icon does not change. (macOS itself always shows its green camera dot and purple screen-recording dot while it records. That cannot be switched off.)
 - When any capture is finished, whether automatic or from the big button or the menu-bar icon, a small panel waits in the **bottom-right corner** of the MacBook screen: "New capture, waiting for a caption", with **Caption** (opens the page at that capture) and **Delete** (removes the capture and its videos for good; the first click turns the button into "Sure? Delete", and a second click within 3 seconds does it). It stays until you caption, save or delete it (the **Skip** button on the page's card also clears it without deleting), and it hides itself while a capture is recording so it never appears in your own clip. This panel is part of the menu-bar button app (below).
 - **CAPTURE NOW** does the same on the spot, and counts down while it records. (Only the automatic ones are silent; the button counts down so you know when to move.)
+- **Capture every** (top of the page) sets how often it captures on its own, from every 5 minutes to every 2 hours. A change takes effect at once, the countdown starts again from that moment, and it is remembered when you restart.
 - **Pause logging** stops the automatic captures (the big button still works).
 - Each capture is a card. The clip plays by itself, silently and on a loop, while it is on screen (click it to pause or play). On the card you can:
   - Write a **caption**. It saves itself as you type (it says "Saved", or "NOT saved" if something is wrong).
@@ -82,7 +83,7 @@ A day of captures is a few hundred MB. Deleting a capture frees all of it. (Phot
 
 | | |
 |---|---|
-| `everyMinutes` | how often it captures on its own (15) |
+| `everyMinutes` | how often it captures on its own (15). You can change it on the page ("Capture every", top right); the page saves it here for you |
 | `seconds` | length of each clip (6) |
 | `warmupSeconds` | seconds thrown away at the start while the camera adjusts (1) |
 | `defaultPanels` | the panels a new capture starts with, top to bottom, one, two or three of `screen0`, `screen1`, `camera` (`["screen1", "camera"]`; use `["screen1"]` for one full-screen panel) |

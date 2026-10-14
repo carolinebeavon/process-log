@@ -12,6 +12,7 @@ const bigLabel = document.getElementById('big-label')
 const bigHint = document.getElementById('big-hint')
 const statusText = document.getElementById('status')
 const pauseButton = document.getElementById('pause')
+const everySelect = document.getElementById('every')
 const errorBox = document.getElementById('error')
 const noteBox = document.getElementById('note')
 const listEl = document.getElementById('list')
@@ -70,6 +71,7 @@ function drawTop() {
     ? `Logging on · next capture in ${formatCountdown(state.nextAt - Date.now())}`
     : 'Logging paused · nothing is captured automatically'
   pauseButton.textContent = state.logging ? 'Pause logging' : 'Resume logging'
+  drawFrequency()
 
   errorBox.hidden = !state.error
   if (state.error) document.getElementById('error-text').textContent = `Capture failed: ${state.error.message}`
@@ -79,6 +81,21 @@ function drawTop() {
   noteBox.hidden = !state.note
   if (state.note) document.getElementById('note-text').textContent = state.note.message
 }
+
+// "Capture every …": the choices are fixed, plus whatever the settings file already has if that is something else.
+const EVERY_CHOICES = [5, 10, 15, 20, 30, 45, 60, 90, 120]
+const minutesText = (m) => (m < 60 ? `${m} minutes` : m % 60 === 0 ? `${m / 60} hour${m === 60 ? '' : 's'}` : `${m} minutes`)
+function drawFrequency() {
+  const choices = EVERY_CHOICES.includes(state.everyMinutes) ? EVERY_CHOICES : [...EVERY_CHOICES, state.everyMinutes].sort((a, b) => a - b)
+  if (everySelect.options.length !== choices.length || [...everySelect.options].some((o, i) => Number(o.value) !== choices[i])) {
+    everySelect.textContent = ''
+    for (const m of choices) everySelect.append(el('option', { value: String(m), textContent: minutesText(m) }))
+  }
+  if (document.activeElement !== everySelect) everySelect.value = String(state.everyMinutes)
+}
+everySelect.addEventListener('change', () => {
+  api('POST', '/api/settings', { everyMinutes: Number(everySelect.value) }).then(refresh).catch((e) => { showProblem(e.message); refresh() })
+})
 
 bigButton.addEventListener('click', () => {
   bigButton.disabled = true

@@ -65,10 +65,12 @@ body {
 .wrap { max-width: 1000px; margin: 0 auto; padding: 22px var(--gap) 60px; }
 
 /* ------------------------------------------------------------ top */
-.top { display: flex; justify-content: space-between; align-items: center; gap: var(--gap); margin-bottom: 16px; }
+.top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px var(--gap); margin-bottom: 16px; }
+.brand, .chip-button, .every, .status { white-space: nowrap; }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 650; letter-spacing: 0.01em; }
 .brand__mark { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 14px var(--accent-glow); }
-.statusbar { display: flex; align-items: center; gap: 12px; }
+.statusbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px 12px; }
+.every { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
 .status { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .status--on::before { background: var(--ok); box-shadow: 0 0 0 0 var(--ok); animation: pulse 2.4s ease-out infinite; }

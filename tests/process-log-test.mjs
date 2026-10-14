@@ -437,6 +437,38 @@ await test('a recording that fails leaves an error on screen, saves nothing, and
   } finally { t.close() }
 })
 
+await test('the capture frequency can be changed on the page: it applies at once, restarts the countdown, is saved, and bad values are refused', async () => {
+  const t = await boot(colourSources())
+  try {
+    fs.writeFileSync(path.join(t.rootDir, 'config.json'), JSON.stringify({ everyMinutes: 15, defaultPanels: ['screen1', 'camera'], cameraName: 'Other camera' }))
+    const before = t.app.state.nextAt
+    const res = await t.call('POST', '/api/settings', { everyMinutes: 30 })
+    assert.equal(res.status, 200)
+    const state = (await t.call('GET', '/api/state')).body
+    assert.equal(state.everyMinutes, 30)
+    const minutesAhead = (t.app.state.nextAt - Date.now()) / 60000
+    assert.ok(minutesAhead > 29.5 && minutesAhead <= 30, `the next capture is 30 minutes from now (got ${minutesAhead})`)
+    assert.ok(t.app.state.nextAt > before)
+    const saved = JSON.parse(fs.readFileSync(path.join(t.rootDir, 'config.json'), 'utf8'))
+    assert.equal(saved.everyMinutes, 30, 'saved to the settings file')
+    assert.equal(saved.cameraName, 'Other camera', 'the other settings are kept as they were')
+    for (const bad of [0, 1, -5, 2.5, 5000, '15', null, undefined]) assert.equal((await t.call('POST', '/api/settings', { everyMinutes: bad })).status, 400, String(bad))
+    assert.equal(t.app.state.nextAt > 0 && (await t.call('GET', '/api/state')).body.everyMinutes, 30, 'bad values change nothing')
+  } finally { t.close() }
+})
+
+await test('changing the frequency while logging is paused does not switch logging back on', async () => {
+  const t = await boot(colourSources())
+  try {
+    await t.call('POST', '/api/logging', { on: false })
+    assert.equal((await t.call('POST', '/api/settings', { everyMinutes: 10 })).status, 200)
+    assert.equal(t.app.state.logging, false)
+    assert.equal(t.app.state.nextAt, null)
+    await t.call('POST', '/api/logging', { on: true })
+    assert.ok((t.app.state.nextAt - Date.now()) / 60000 > 9.5, 'resuming uses the new spacing')
+  } finally { t.close() }
+})
+
 await test('the 15-minute timer skips while the screen is locked, and does nothing while paused', async () => {
   let locked = true
   const t = await boot(colourSources(), { screenIsLocked: async () => locked })

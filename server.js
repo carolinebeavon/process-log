@@ -188,6 +188,16 @@ export function startServer({ rootDir = HERE, config, getSources, screenIsLocked
     return wanted.map((name) => (available.has(name) ? name : screens[0].name))
   }
 
+  // Remembers one setting in config.json so it survives a restart (all the other settings are kept as they were).
+  function saveSetting(key, value) {
+    const file = path.join(rootDir, 'config.json')
+    let current
+    try { current = JSON.parse(fs.readFileSync(file, 'utf8')) } catch { current = { ...config } }
+    current[key] = value
+    fs.writeFileSync(`${file}.tmp`, JSON.stringify(current, null, 2) + '\n')
+    fs.renameSync(`${file}.tmp`, file)
+  }
+
   function scheduleNext() {
     clearTimeout(timer)
     const ms = config.everyMinutes * 60 * 1000
@@ -266,6 +276,15 @@ export function startServer({ rootDir = HERE, config, getSources, screenIsLocked
         if (state.capturing) return sendJson(res, 409, { error: 'Already recording' })
         takeCapture('button') // runs in the background; the page watches /api/state
         return sendJson(res, 202, { ok: true })
+      }
+      if (route === 'POST /api/settings') {
+        const { everyMinutes } = await readJson(req)
+        if (!Number.isInteger(everyMinutes) || everyMinutes < 2 || everyMinutes > 1440) return sendJson(res, 400, { error: 'How often must be a whole number of minutes, from 2 to 1440' })
+        config.everyMinutes = everyMinutes
+        saveSetting('everyMinutes', everyMinutes)
+        if (state.logging) scheduleNext() // the countdown starts again from now, at the new spacing
+        say(`Capture frequency changed: every ${everyMinutes} minutes`)
+        return sendJson(res, 200, { everyMinutes, nextAt: state.nextAt })
       }
       if (route === 'POST /api/logging') {
         const body = await readJson(req)
