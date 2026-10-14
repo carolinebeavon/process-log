@@ -284,6 +284,60 @@ await test('one panel: the whole frame is the camera, a screen over a blurred ba
   } finally { t.close() }
 })
 
+await test('flip: only the panels marked as flipped are mirrored in the recipe', () => {
+  const screen = { file: 's.mp4', kind: 'screen', size: { w: 1920, h: 1080 } }
+  const me = { file: 'c.mp4', kind: 'camera', size: { w: 1280, h: 720 } }
+  const filterOf = (args) => args[args.indexOf('-filter_complex') + 1]
+  const parts = filterOf(buildFinalArgs([screen, { ...me, flip: true }, screen], 'o.mp4', {})).split(';')
+  assert.ok(!parts[0].includes('hflip') && parts[1].includes('hflip') && !parts[2].includes('hflip'))
+  assert.ok(!filterOf(buildFinalArgs([screen, me], 'o.mp4', {})).includes('hflip'), 'off unless asked for')
+  assert.ok(filterOf(buildFinalArgs([{ ...screen, flip: true }], 'o.mp4', {})).includes('hflip'), 'a single flipped panel')
+  assert.ok(filterOf(buildFinalArgs([{ ...screen, flip: true }], 'o.mp4', { singleFit: 'fill' })).includes('hflip'), 'and a single flipped panel that fills the frame')
+})
+
+await test('flip: each panel mirrors on its own, left to right, and nothing else changes', async () => {
+  // the screen has a blue stripe at its far left; the camera is red with a white stripe left of centre
+  const screen = { ...solid('screen1', 'green', '1920x1080'), inputArgs: ['-f', 'lavfi', '-i', 'color=c=green:s=1920x1080:r=15,drawbox=x=0:y=0:w=100:h=1080:color=blue:t=fill'] }
+  const camera = { ...solid('camera', 'red', '1280x720'), inputArgs: ['-f', 'lavfi', '-i', 'color=c=red:s=1280x720:r=15,drawbox=x=440:y=0:w=100:h=720:color=white:t=fill'] }
+  const t = await boot([solid('screen0', 'green', '2940x1912'), screen, camera])
+  try {
+    await t.call('POST', '/api/capture'); await wait(100); await t.finish()
+    const id = t.app.store.list()[0].id
+    const final = path.join(t.app.store.folderFor(id), 'final.mp4')
+    const isBlue = ([r, g, b]) => b > 150 && r < 90 && g < 90
+    const isWhite = ([r, g, b]) => r > 200 && g > 200 && b > 200
+    const patch = async (body, expect = 200) => { const r = await t.call('PATCH', `/api/captures/${id}`, body); assert.equal(r.status, expect, JSON.stringify(r.body)); if (expect === 200) assert.equal(size(final), '1080,1920') }
+
+    // not flipped: the stripes are where the footage has them
+    assert.ok(isBlue(pixel(final, 10, 300)) && !isBlue(pixel(final, 1068, 300)), 'screen stripe at the left')
+    assert.ok(isWhite(pixel(final, 270, 1700)) && !isWhite(pixel(final, 810, 1700)), 'camera stripe left of centre')
+
+    await patch({ flips: [false, true] }) // flip only the camera panel
+    assert.ok(isBlue(pixel(final, 10, 300)), 'the screen is not flipped')
+    assert.ok(!isWhite(pixel(final, 270, 1700)) && isWhite(pixel(final, 810, 1700)), 'the camera stripe is now right of centre')
+
+    await patch({ flips: [true, false] }) // flip only the screen panel
+    assert.ok(!isBlue(pixel(final, 10, 300)) && isBlue(pixel(final, 1068, 300)), 'the screen stripe moved to the right')
+    assert.ok(isWhite(pixel(final, 270, 1700)), 'the camera is back to normal')
+    assert.deepEqual(t.app.store.get(id).flips, [true, false])
+
+    // the choice stays with its slot when the panels change, and is trimmed when a panel goes
+    await patch({ panels: ['screen1', 'camera', 'screen1'] })
+    assert.deepEqual(t.app.store.get(id).flips, [true, false, false])
+    await patch({ panels: ['screen1'] })
+    assert.deepEqual(t.app.store.get(id).flips, [true])
+
+    // one panel: whole screen over a backdrop ("fit"), and filling the frame ("fill")
+    assert.ok(isBlue(pixel(final, 1068, 960)) && !isBlue(pixel(final, 10, 960)), 'fit: flipped')
+    await patch({ flips: [false] })
+    assert.ok(isBlue(pixel(final, 10, 960)) && !isBlue(pixel(final, 1068, 960)), 'fit: not flipped')
+
+    // bad values are refused and change nothing
+    for (const bad of ['yes', [1], [true, false, true, false], [null], 'true']) await patch({ flips: bad }, 400)
+    assert.deepEqual(t.app.store.get(id).flips, [false])
+  } finally { t.close() }
+})
+
 await test('trim top: the recipe crops screens only (never the camera), and not at all when it is off', () => {
   const screen = { file: 's.mp4', kind: 'screen', size: { w: 1920, h: 1080 } }
   const me = { file: 'c.mp4', kind: 'camera', size: { w: 1280, h: 720 } }

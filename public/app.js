@@ -134,6 +134,8 @@ function makeCard(entry) {
     const select = el('select', { className: 'slot' })
     const blur = el('select', { className: 'slot slot--blur', title: 'Blur this panel to hide something' })
     for (const [value, text] of [['off', 'Blur: off'], ['soft', 'Blur: soft'], ['heavy', 'Blur: heavy']]) blur.append(el('option', { value, textContent: text }))
+    const flip = el('button', { className: 'chip-button flip', type: 'button', textContent: 'Flip', title: 'Mirror this panel left to right' })
+    flip.setAttribute('aria-pressed', 'false')
     if (position === 1) select.append(el('option', { value: '', textContent: 'nothing (one panel, full screen)' }))
     if (position === 2) select.append(el('option', { value: '', textContent: 'nothing (two panels)' }))
     for (const screen of entry.screens) select.append(el('option', { value: screen.name, textContent: `Screen ${screen.number + 1}` }))
@@ -142,12 +144,13 @@ function makeCard(entry) {
       // A panel set to "nothing" ends the list: with the middle one off there is just one panel.
       const used = []
       for (const slot of slots) { if (slot.select.value === '') break; used.push(slot) }
-      change(entry.id, { panels: used.map((s) => s.select.value), blurs: used.map((s) => s.blur.value) })
+      change(entry.id, { panels: used.map((s) => s.select.value), blurs: used.map((s) => s.blur.value), flips: used.map((s) => s.flip.getAttribute('aria-pressed') === 'true') })
     }
     select.addEventListener('change', apply)
     blur.addEventListener('change', apply)
-    slotRows.push(el('label', { className: 'slot-row' }, el('span', { textContent: label }), select, blur))
-    return { select, blur }
+    flip.addEventListener('click', () => { flip.setAttribute('aria-pressed', String(flip.getAttribute('aria-pressed') !== 'true')); apply() })
+    slotRows.push(el('div', { className: 'slot-row' }, el('span', { textContent: label }), select, blur, flip))
+    return { select, blur, flip }
   })
 
   // Small pictures so you can tell which screen is which. They are not buttons.
@@ -338,13 +341,15 @@ function updateCard(card, entry, isBusy) {
   card.fitRow.hidden = !(entry.panels.length === 1 && entry.panels[0] !== 'camera')
   card.fitSelect.value = entry.singleFit ?? 'fit'
   card.fitSelect.disabled = isBusy
-  card.slots.forEach(({ select, blur }, position) => {
+  card.slots.forEach(({ select, blur, flip }, position) => {
     select.value = entry.panels[position] ?? ''
     // the panels below a "nothing" are off, so they cannot be set
     if (position > 0) select.disabled = isBusy || entry.panels[position - 1] === undefined
     blur.value = (entry.blurs ?? [])[position] ?? 'off'
     if (position === 0) select.disabled = isBusy
     blur.disabled = isBusy || entry.panels[position] === undefined
+    flip.setAttribute('aria-pressed', String(Boolean((entry.flips ?? [])[position])))
+    flip.disabled = isBusy || entry.panels[position] === undefined
   })
 }
 

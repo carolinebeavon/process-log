@@ -155,7 +155,7 @@ export function startServer({ rootDir = HERE, config, getSources, screenIsLocked
 
       const screens = []
       for (const s of screenSources) screens.push({ number: s.number, name: s.name, ...(await probeSize(path.join(dir, `${s.name}.mp4`))) })
-      const entry = { id, time: new Date().toISOString(), kind, caption: '', screens, panels: startingPanels(screens), blurs: [], renderedAt: Date.now(), cameraGrey: Boolean(config.cameraBlackAndWhite), cropTop: Number(config.screenCropTop) || 0, singleFit: 'fit', pending: true }
+      const entry = { id, time: new Date().toISOString(), kind, caption: '', screens, panels: startingPanels(screens), blurs: [], flips: [], renderedAt: Date.now(), cameraGrey: Boolean(config.cameraBlackAndWhite), cropTop: Number(config.screenCropTop) || 0, singleFit: 'fit', pending: true }
       await buildClip(dir, entry)
       for (const s of screens) await makeJpeg(path.join(dir, `${s.name}.mp4`), path.join(dir, `thumb-${s.name}.jpg`), 360)
       store.add(entry)
@@ -177,7 +177,7 @@ export function startServer({ rootDir = HERE, config, getSources, screenIsLocked
 
   // Builds (or rebuilds) final.mp4 for an entry from its current choices.
   async function buildClip(dir, entry) {
-    await renderFinal(dir, { panels: entry.panels, blurs: entry.blurs, cameraGrey: entry.cameraGrey, cropTop: entry.cropTop ?? 0, singleFit: entry.singleFit ?? 'fit' })
+    await renderFinal(dir, { panels: entry.panels, blurs: entry.blurs, flips: entry.flips ?? [], cameraGrey: entry.cameraGrey, cropTop: entry.cropTop ?? 0, singleFit: entry.singleFit ?? 'fit' })
   }
 
   // The panels a new capture starts with, from config.json's "defaultPanels". A name for a
@@ -333,18 +333,23 @@ export function startServer({ rootDir = HERE, config, getSources, screenIsLocked
         const newBlurs = newPanels.map((_, i) => (body.blurs ?? entry.blurs ?? [])[i] ?? 'off')
         if (body.blurs !== undefined && (!Array.isArray(body.blurs) || body.blurs.length > newPanels.length)) return sendJson(res, 400, { error: 'Blur needs one setting per panel' })
         if (!newBlurs.every((level) => level in BLUR_SIGMA)) return sendJson(res, 400, { error: 'Blur can be off, soft or heavy' })
+        // One flip setting per panel: true mirrors that panel left to right. Missing ones mean false.
+        if (body.flips !== undefined && (!Array.isArray(body.flips) || body.flips.length > newPanels.length)) return sendJson(res, 400, { error: 'Flip needs one setting per panel' })
+        const flipsGiven = body.flips ?? entry.flips ?? []
+        const newFlips = newPanels.map((_, i) => (i < flipsGiven.length ? flipsGiven[i] : false))
+        if (!newFlips.every((on) => typeof on === 'boolean')) return sendJson(res, 400, { error: 'Flip can only be on or off' })
         if (body.cropTop !== undefined && !(typeof body.cropTop === 'number' && body.cropTop >= 0 && body.cropTop <= 0.4)) return sendJson(res, 400, { error: 'The trim must be between 0 and 40 percent' })
         const newCrop = body.cropTop ?? entry.cropTop ?? 0
         if (body.singleFit !== undefined && !['fit', 'fill'].includes(body.singleFit)) return sendJson(res, 400, { error: 'A single screen can be shown as fit or fill' })
         const newFit = body.singleFit ?? entry.singleFit ?? 'fit'
         const newGrey = typeof body.cameraGrey === 'boolean' ? body.cameraGrey : entry.cameraGrey
-        if (newPanels.join() !== entry.panels.join() || newBlurs.join() !== (entry.blurs ?? []).concat(['off', 'off', 'off']).slice(0, newPanels.length).join() || newGrey !== entry.cameraGrey || newCrop !== (entry.cropTop ?? 0) || newFit !== (entry.singleFit ?? 'fit')) {
+        if (newPanels.join() !== entry.panels.join() || newBlurs.join() !== (entry.blurs ?? []).concat(['off', 'off', 'off']).slice(0, newPanels.length).join() || newGrey !== entry.cameraGrey || newCrop !== (entry.cropTop ?? 0) || newFit !== (entry.singleFit ?? 'fit') || newFlips.join() !== (entry.flips ?? []).concat([false, false, false]).slice(0, newPanels.length).join()) {
           if (rebuilding.has(entry.id)) return sendJson(res, 409, { error: 'Already rebuilding this clip' })
           rebuilding.add(entry.id)
           try {
-            const changed = { ...entry, panels: newPanels, blurs: newBlurs, cameraGrey: newGrey, cropTop: newCrop, singleFit: newFit }
+            const changed = { ...entry, panels: newPanels, blurs: newBlurs, flips: newFlips, cameraGrey: newGrey, cropTop: newCrop, singleFit: newFit }
             await buildClip(store.folderFor(entry.id), changed)
-            store.update(entry.id, { panels: newPanels, blurs: newBlurs, cameraGrey: newGrey, cropTop: newCrop, singleFit: newFit, renderedAt: Date.now() })
+            store.update(entry.id, { panels: newPanels, blurs: newBlurs, flips: newFlips, cameraGrey: newGrey, cropTop: newCrop, singleFit: newFit, renderedAt: Date.now() })
           } finally {
             rebuilding.delete(entry.id)
           }

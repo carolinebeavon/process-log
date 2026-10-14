@@ -182,6 +182,7 @@ export const BLUR_SIGMA = { off: 0, soft: 12, heavy: 40 }
 // `options.cameraGrey` turns the camera picture (not the screens) black and white.
 // `options.cropTop` (0 to 0.4) trims that share off the TOP of every screen (the menu bar, a browser's
 // address bar), before it is scaled into its panel. It does not touch the camera.
+// A panel with `flip: true` is mirrored left to right (a camera often needs this to match a screen).
 // `options.singleFit` only matters for a clip of ONE screen: 'fit' (the default) shows the whole screen in the
 // middle of the frame over a soft, darkened, blurred copy of itself; 'fill' makes the screen cover the whole
 // frame, which crops away most of its sides. One panel of the camera always fills the frame.
@@ -195,7 +196,8 @@ export function buildFinalArgs(panels, outFile, options = {}) {
     const sigma = BLUR_SIGMA[p.blur ?? 'off']
     if (sigma === undefined) throw new Error(`Unknown blur: ${p.blur}`)
     const blur = sigma > 0 ? `gblur=sigma=${sigma},` : ''
-    return `[${i}:v]fps=30,${cropTop}${grey}scale=${W}:${heights[i]}:force_original_aspect_ratio=increase,crop=${W}:${heights[i]},${blur}setsar=1[p${i}]`
+    const flip = p.flip ? 'hflip,' : ''
+    return `[${i}:v]fps=30,${cropTop}${flip}${grey}scale=${W}:${heights[i]}:force_original_aspect_ratio=increase,crop=${W}:${heights[i]},${blur}setsar=1[p${i}]`
   })
   let filter
   if (panels.length === 1) {
@@ -205,7 +207,7 @@ export function buildFinalArgs(panels, outFile, options = {}) {
     const blur = sigma > 0 ? `gblur=sigma=${sigma},` : ''
     const cropTop = only.kind === 'screen' && options.cropTop > 0 ? `crop=iw:trunc(ih*(1-${options.cropTop})/2)*2:0:trunc(ih*${options.cropTop}/2)*2,` : ''
     if (only.kind === 'screen' && (options.singleFit ?? 'fit') === 'fit') {
-      filter = `[0:v]fps=30,${cropTop}split=2[back][front];` +
+      filter = `[0:v]fps=30,${cropTop}${only.flip ? 'hflip,' : ''}split=2[back][front];` +
         `[back]scale=${W}:${STORY_HEIGHT}:force_original_aspect_ratio=increase,crop=${W}:${STORY_HEIGHT},gblur=sigma=40,eq=brightness=-0.15[dark];` +
         `[front]scale=${W}:-2[whole];[dark][whole]overlay=(W-w)/2:(H-h)/2,${blur}setsar=1[v]`
     } else {
@@ -226,14 +228,14 @@ export function buildFinalArgs(panels, outFile, options = {}) {
 // Builds final.mp4. It is written under another name first and then renamed,
 // so a half-made file is never shown. `panels` is a list of names, top to
 // bottom, such as ["screen1", "camera", "screen0"].
-export async function renderFinal(dir, { panels, blurs = [], cameraGrey, cropTop = 0, singleFit = 'fit' }) {
+export async function renderFinal(dir, { panels, blurs = [], flips = [], cameraGrey, cropTop = 0, singleFit = 'fit' }) {
   const described = []
   for (const [position, name] of panels.entries()) {
     const file = path.join(dir, `${name}.mp4`)
     const kind = name === 'camera' ? 'camera' : 'screen'
     const size = await probeSize(file)
     // a trimmed screen is shorter, which changes how tall it is shown in a two-panel clip
-    described.push({ file, kind, size: kind === 'screen' ? { w: size.w, h: Math.round(size.h * (1 - cropTop)) } : size, blur: blurs[position] ?? 'off' })
+    described.push({ file, kind, size: kind === 'screen' ? { w: size.w, h: Math.round(size.h * (1 - cropTop)) } : size, blur: blurs[position] ?? 'off', flip: Boolean(flips[position]) })
   }
   const temp = path.join(dir, 'final.tmp.mp4')
   const result = await run(FFMPEG, buildFinalArgs(described, temp, { cameraGrey, cropTop, singleFit }), { timeoutMs: 120000 })

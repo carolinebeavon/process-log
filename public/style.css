@@ -113,6 +113,7 @@ button { font: inherit; color: inherit; }
 }
 .chip-button:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-2); }
 .chip-button:disabled { opacity: 0.5; cursor: default; }
+.chip-button[aria-pressed="true"] { border-color: transparent; background: linear-gradient(120deg, var(--accent), var(--accent-2)); color: var(--accent-text); font-weight: 600; }
 .ghost { padding: 6px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: color 0.2s, background 0.2s; }
 .ghost:hover { background: var(--surface-2); color: var(--text); }
 .ghost--danger:hover { background: var(--danger-bg); color: var(--danger); }
@@ -191,7 +192,7 @@ textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4
 .group-label { font-size: 11px; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
-.slot-row { display: flex; align-items: center; gap: 10px; }
+.slot-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
 .slot-row > span { width: 62px; color: var(--muted); font-size: 13px; }
 select.slot {
   appearance: none; -webkit-appearance: none;
@@ -199,6 +200,7 @@ select.slot {
   border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239b99a6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
   color: var(--text); font: inherit; cursor: pointer;
+  max-width: 210px; text-overflow: ellipsis;
   transition: border-color 0.2s;
 }
 select.slot:hover:not(:disabled) { border-color: var(--border-strong); }
