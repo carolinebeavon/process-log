@@ -157,7 +157,7 @@ export function storyLayout(screenSize) {
   return { screenHeight, meHeight: STORY_HEIGHT - screenHeight }
 }
 
-// A finished clip is two or three panels stacked top to bottom. Each panel shows one
+// A finished clip is one, two or three panels stacked top to bottom. Each panel shows one
 // recording: a screen ("screen0", "screen1") or you ("camera"). Any order, and the
 // same recording may be used twice.
 //
@@ -165,6 +165,7 @@ export function storyLayout(screenSize) {
 //   two panels   : if one is a screen and one is you, the screen is shown WHOLE at full width
 //                  and you fill the rest; otherwise two equal halves
 export function panelHeights(panels) {
+  if (panels.length === 1) return [STORY_HEIGHT]
   if (panels.length === 3) return [STORY_HEIGHT / 3, STORY_HEIGHT / 3, STORY_HEIGHT / 3]
   const screens = panels.filter((p) => p.kind === 'screen')
   if (panels.length === 2 && screens.length === 1) {
@@ -181,8 +182,11 @@ export const BLUR_SIGMA = { off: 0, soft: 12, heavy: 40 }
 // `options.cameraGrey` turns the camera picture (not the screens) black and white.
 // `options.cropTop` (0 to 0.4) trims that share off the TOP of every screen (the menu bar, a browser's
 // address bar), before it is scaled into its panel. It does not touch the camera.
+// `options.singleFit` only matters for a clip of ONE screen: 'fit' (the default) shows the whole screen in the
+// middle of the frame over a soft, darkened, blurred copy of itself; 'fill' makes the screen cover the whole
+// frame, which crops away most of its sides. One panel of the camera always fills the frame.
 export function buildFinalArgs(panels, outFile, options = {}) {
-  if (panels.length < 2 || panels.length > 3) throw new Error('A clip needs two or three panels.')
+  if (panels.length < 1 || panels.length > 3) throw new Error('A clip needs one, two or three panels.')
   const W = STORY_WIDTH
   const heights = panelHeights(panels)
   const parts = panels.map((p, i) => {
@@ -193,11 +197,27 @@ export function buildFinalArgs(panels, outFile, options = {}) {
     const blur = sigma > 0 ? `gblur=sigma=${sigma},` : ''
     return `[${i}:v]fps=30,${cropTop}${grey}scale=${W}:${heights[i]}:force_original_aspect_ratio=increase,crop=${W}:${heights[i]},${blur}setsar=1[p${i}]`
   })
-  const stack = `${panels.map((_, i) => `[p${i}]`).join('')}vstack=inputs=${panels.length}[v]`
+  let filter
+  if (panels.length === 1) {
+    // One panel is the whole frame, so there is nothing to stack.
+    const only = panels[0]
+    const sigma = BLUR_SIGMA[only.blur ?? 'off']
+    const blur = sigma > 0 ? `gblur=sigma=${sigma},` : ''
+    const cropTop = only.kind === 'screen' && options.cropTop > 0 ? `crop=iw:trunc(ih*(1-${options.cropTop})/2)*2:0:trunc(ih*${options.cropTop}/2)*2,` : ''
+    if (only.kind === 'screen' && (options.singleFit ?? 'fit') === 'fit') {
+      filter = `[0:v]fps=30,${cropTop}split=2[back][front];` +
+        `[back]scale=${W}:${STORY_HEIGHT}:force_original_aspect_ratio=increase,crop=${W}:${STORY_HEIGHT},gblur=sigma=40,eq=brightness=-0.15[dark];` +
+        `[front]scale=${W}:-2[whole];[dark][whole]overlay=(W-w)/2:(H-h)/2,${blur}setsar=1[v]`
+    } else {
+      filter = parts[0].replace('[p0]', '[v]')
+    }
+  } else {
+    filter = `${parts.join(';')};${panels.map((_, i) => `[p${i}]`).join('')}vstack=inputs=${panels.length}[v]`
+  }
   return [
     '-hide_banner', '-loglevel', 'error', '-y',
     ...panels.flatMap((p) => ['-i', p.file]),
-    '-filter_complex', `${parts.join(';')};${stack}`,
+    '-filter_complex', filter,
     '-map', '[v]', '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
     outFile,
   ]
@@ -206,7 +226,7 @@ export function buildFinalArgs(panels, outFile, options = {}) {
 // Builds final.mp4. It is written under another name first and then renamed,
 // so a half-made file is never shown. `panels` is a list of names, top to
 // bottom, such as ["screen1", "camera", "screen0"].
-export async function renderFinal(dir, { panels, blurs = [], cameraGrey, cropTop = 0 }) {
+export async function renderFinal(dir, { panels, blurs = [], cameraGrey, cropTop = 0, singleFit = 'fit' }) {
   const described = []
   for (const [position, name] of panels.entries()) {
     const file = path.join(dir, `${name}.mp4`)
@@ -216,7 +236,7 @@ export async function renderFinal(dir, { panels, blurs = [], cameraGrey, cropTop
     described.push({ file, kind, size: kind === 'screen' ? { w: size.w, h: Math.round(size.h * (1 - cropTop)) } : size, blur: blurs[position] ?? 'off' })
   }
   const temp = path.join(dir, 'final.tmp.mp4')
-  const result = await run(FFMPEG, buildFinalArgs(described, temp, { cameraGrey, cropTop }), { timeoutMs: 120000 })
+  const result = await run(FFMPEG, buildFinalArgs(described, temp, { cameraGrey, cropTop, singleFit }), { timeoutMs: 120000 })
   if (result.code !== 0) {
     fs.rmSync(temp, { force: true })
     throw new Error(`Could not build the clip: ${result.err.slice(-300)}`)

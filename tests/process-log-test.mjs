@@ -101,6 +101,7 @@ await test('screen height at full width plus your height always fills 1920, and 
 await test('panel heights: three equal thirds; a screen and you = the whole screen plus the rest; anything else = halves', () => {
   const screen = { kind: 'screen', size: { w: 1920, h: 1080 } }
   const me = { kind: 'camera', size: { w: 1280, h: 720 } }
+  assert.deepEqual(panelHeights([screen]), [1920], 'one panel is the whole frame')
   assert.deepEqual(panelHeights([screen, me, screen]), [640, 640, 640])
   assert.deepEqual(panelHeights([screen, me]), [608, 1312])
   assert.deepEqual(panelHeights([me, screen]), [1312, 608])
@@ -108,10 +109,12 @@ await test('panel heights: three equal thirds; a screen and you = the whole scre
   assert.deepEqual(panelHeights([me, me]), [960, 960])
 })
 
-await test('a clip with one panel, or four, is refused', () => {
+await test('a clip with no panels, or four, is refused; one panel is allowed', () => {
   const one = [{ file: 'a.mp4', kind: 'screen', size: { w: 10, h: 10 } }]
-  assert.throws(() => buildFinalArgs(one, 'o.mp4'), /two or three/)
-  assert.throws(() => buildFinalArgs([...one, ...one, ...one, ...one], 'o.mp4'), /two or three/)
+  assert.throws(() => buildFinalArgs([], 'o.mp4'), /one, two or three/)
+  assert.throws(() => buildFinalArgs([...one, ...one, ...one, ...one], 'o.mp4'), /one, two or three/)
+  assert.ok(buildFinalArgs(one, 'o.mp4').includes('[v]'))
+  assert.ok(!buildFinalArgs(one, 'o.mp4').join(' ').includes('vstack'), 'nothing to stack with one panel')
 })
 
 await test('ids look like the day and time, and the store refuses an id that is not one', () => {
@@ -243,6 +246,44 @@ await test('blur is set per panel: each panel blurs on its own, only in the fini
   } finally { t.close() }
 })
 
+await test('one panel: the whole frame is the camera, a screen over a blurred backdrop ("fit"), or the screen filling the frame ("fill")', async () => {
+  // a green screen with a blue stripe down its far left edge, so we can tell whether the sides are kept or cropped away
+  const striped = { ...solid('screen1', 'green', '1920x1080'), inputArgs: ['-f', 'lavfi', '-i', 'color=c=green:s=1920x1080:r=15,drawbox=x=0:y=0:w=100:h=1080:color=blue:t=fill'] }
+  const t = await boot([solid('screen0', 'red', '2940x1912'), striped, solid('camera', 'blue', '1280x720')])
+  try {
+    await t.call('POST', '/api/capture'); await wait(100); await t.finish()
+    const id = t.app.store.list()[0].id
+    const final = path.join(t.app.store.folderFor(id), 'final.mp4')
+    const patch = async (body) => { const r = await t.call('PATCH', `/api/captures/${id}`, body); assert.equal(r.status, 200, JSON.stringify(r.body)); assert.equal(size(final), '1080,1920') }
+
+    // the camera alone fills the frame, top to bottom
+    await patch({ panels: ['camera'] })
+    assert.deepEqual([dominant(pixel(final, 540, 40)), dominant(pixel(final, 540, 960)), dominant(pixel(final, 540, 1880))], ['blue', 'blue', 'blue'])
+
+    // a screen, "fit" (the default): the whole screen in the middle, a darker blurred copy behind it
+    await patch({ panels: ['screen1'] })
+    assert.equal(t.app.store.get(id).singleFit, 'fit')
+    assert.deepEqual(pixel(final, 10, 960).map((c) => c > 150), [false, false, true], 'the blue stripe at the far left of the screen is visible')
+    const [, middleGreen] = pixel(final, 540, 960)
+    const [, backdropGreen] = pixel(final, 540, 100)
+    assert.ok(middleGreen > 118, 'the screen itself is green in the middle')
+    assert.ok(backdropGreen > 30 && backdropGreen < middleGreen - 15, `the backdrop is a darker green (middle ${middleGreen}, backdrop ${backdropGreen})`)
+
+    // "fill": the screen covers the frame, so its far-left stripe is cropped off and green runs top to bottom
+    await patch({ singleFit: 'fill' })
+    assert.deepEqual([dominant(pixel(final, 10, 960)), dominant(pixel(final, 540, 40)), dominant(pixel(final, 540, 1880))], ['green', 'green', 'green'])
+    assert.equal(t.app.store.get(id).singleFit, 'fill')
+
+    // the choice only matters for a screen; bad values are refused and change nothing
+    for (const bad of ['stretch', 3, null]) assert.equal((await t.call('PATCH', `/api/captures/${id}`, { singleFit: bad })).status, 400, JSON.stringify(bad))
+    assert.equal(t.app.store.get(id).singleFit, 'fill')
+
+    // a blur and a trim apply to the single panel too
+    await patch({ singleFit: 'fit', blurs: ['heavy'], cropTop: 0.2, panels: ['screen1'] })
+    assert.deepEqual(t.app.store.get(id).blurs, ['heavy'])
+  } finally { t.close() }
+})
+
 await test('trim top: the recipe crops screens only (never the camera), and not at all when it is off', () => {
   const screen = { file: 's.mp4', kind: 'screen', size: { w: 1920, h: 1080 } }
   const me = { file: 'c.mp4', kind: 'camera', size: { w: 1280, h: 720 } }
@@ -317,7 +358,7 @@ await test('bad panel choices are refused and change nothing', async () => {
   try {
     await t.call('POST', '/api/capture'); await wait(100); await t.finish()
     const id = (await t.call('GET', '/api/state')).body.captures[0].id
-    for (const panels of [['screen0'], ['screen0', 'camera', 'screen1', 'camera'], ['screen7', 'camera'], ['screen0', 'sideways'], 'screen0', []]) {
+    for (const panels of [['screen0', 'camera', 'screen1', 'camera'], ['screen7', 'camera'], ['screen0', 'sideways'], 'screen0', []]) {
       assert.equal((await t.call('PATCH', `/api/captures/${id}`, { panels })).status, 400, JSON.stringify(panels))
     }
     assert.equal((await t.call('PATCH', '/api/captures/2026-01-01_000000', { caption: 'x' })).status, 404)

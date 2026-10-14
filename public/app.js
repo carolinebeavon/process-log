@@ -117,11 +117,14 @@ function makeCard(entry) {
     const select = el('select', { className: 'slot' })
     const blur = el('select', { className: 'slot slot--blur', title: 'Blur this panel to hide something' })
     for (const [value, text] of [['off', 'Blur: off'], ['soft', 'Blur: soft'], ['heavy', 'Blur: heavy']]) blur.append(el('option', { value, textContent: text }))
+    if (position === 1) select.append(el('option', { value: '', textContent: 'nothing (one panel, full screen)' }))
     if (position === 2) select.append(el('option', { value: '', textContent: 'nothing (two panels)' }))
     for (const screen of entry.screens) select.append(el('option', { value: screen.name, textContent: `Screen ${screen.number + 1}` }))
     select.append(el('option', { value: 'camera', textContent: 'Me' }))
     const apply = () => {
-      const used = slots.filter((s) => s.select.value !== '')
+      // A panel set to "nothing" ends the list: with the middle one off there is just one panel.
+      const used = []
+      for (const slot of slots) { if (slot.select.value === '') break; used.push(slot) }
       change(entry.id, { panels: used.map((s) => s.select.value), blurs: used.map((s) => s.blur.value) })
     }
     select.addEventListener('change', apply)
@@ -237,8 +240,13 @@ function makeCard(entry) {
   cropSlider.setAttribute('aria-label', 'Trim the top of the screens')
   cropSlider.addEventListener('input', () => { cropLabel.textContent = cropSlider.value === '0' ? 'off' : `${cropSlider.value}%` })
   cropSlider.addEventListener('change', () => change(entry.id, { cropTop: Number(cropSlider.value) / 100 }))
+  // With only one panel and it is a screen: show the whole screen over a blurred backdrop, or fill the frame.
+  const fitSelect = el('select', { className: 'slot', title: 'How the single screen sits in the frame' })
+  for (const [value, text] of [['fit', 'Whole screen, blurred backdrop'], ['fill', 'Fill the frame (crops the sides)']]) fitSelect.append(el('option', { value, textContent: text }))
+  fitSelect.addEventListener('change', () => change(entry.id, { singleFit: fitSelect.value }))
+  const fitRow = el('div', { className: 'slot-row' }, el('span', { textContent: 'One screen' }), fitSelect)
   const cropRow = el('div', { className: 'slot-row' }, el('span', { textContent: 'Trim top' }), cropSlider, cropLabel)
-  const panelGroup = el('div', { className: 'group' }, el('div', { className: 'group-label', textContent: 'Panels' }), ...slotRows, cropRow, screenPictures, greyButton)
+  const panelGroup = el('div', { className: 'group' }, el('div', { className: 'group-label', textContent: 'Panels' }), ...slotRows, fitRow, cropRow, screenPictures, greyButton)
   const saveBox = el('div', { className: 'group' }, ...saveGroup.children)
   const details = el('div', { className: 'details' }, head, el('div', {}, caption, captionStatus), panelGroup, saveBox)
   const playBadge = el('div', { className: 'clip__play' }, el('span', { textContent: '▶' }))
@@ -288,7 +296,7 @@ function makeCard(entry) {
   }
 
   redrawCaption()
-  return { el: card, video, caption, waiting, greyButton, slots, cropSlider, cropLabel, soundRow, soundLabel, clearSound, positionSelect, saveButton, saveStatus, view: captionView, renderedAt: null }
+  return { el: card, video, caption, waiting, greyButton, slots, fitRow, fitSelect, cropSlider, cropLabel, soundRow, soundLabel, clearSound, positionSelect, saveButton, saveStatus, view: captionView, renderedAt: null }
 }
 
 // Brings an existing card up to date with the server's version of the capture.
@@ -310,10 +318,15 @@ function updateCard(card, entry, isBusy) {
     card.cropLabel.textContent = card.cropSlider.value === '0' ? 'off' : `${card.cropSlider.value}%`
   }
   drawSaveGroup(card, entry)
+  card.fitRow.hidden = !(entry.panels.length === 1 && entry.panels[0] !== 'camera')
+  card.fitSelect.value = entry.singleFit ?? 'fit'
+  card.fitSelect.disabled = isBusy
   card.slots.forEach(({ select, blur }, position) => {
     select.value = entry.panels[position] ?? ''
+    // the panels below a "nothing" are off, so they cannot be set
+    if (position > 0) select.disabled = isBusy || entry.panels[position - 1] === undefined
     blur.value = (entry.blurs ?? [])[position] ?? 'off'
-    select.disabled = isBusy
+    if (position === 0) select.disabled = isBusy
     blur.disabled = isBusy || entry.panels[position] === undefined
   })
 }

@@ -45,7 +45,7 @@ It only logs while the Mac is awake and the Terminal window is open.
 - **Pause logging** stops the automatic captures (the big button still works).
 - Each capture is a card. The clip plays by itself, silently and on a loop, while it is on screen (click it to pause or play). On the card you can:
   - Write a **caption**. It saves itself as you type (it says "Saved", or "NOT saved" if something is wrong).
-  - Choose the **panels**: three drop-downs, Top / Middle / Bottom. Each can be **Screen 1**, **Screen 2** or **Me**, in any order, and the same one can be used twice. Set the Bottom one to "nothing" for a two-panel clip. In a two-panel clip of one screen and you, the screen is shown whole at full width and you fill the rest; otherwise the panels are equal. The small pictures of the two screens tell them apart.
+  - Choose the **panels**: three drop-downs, Top / Middle / Bottom. Each can be **Screen 1**, **Screen 2** or **Me**, in any order, and the same one can be used twice. Set the Bottom one to "nothing" for a two-panel clip, and the Middle one to "nothing" as well for a **one-panel clip** that fills the whole frame. With one screen, the "One screen" menu chooses between **Whole screen, blurred backdrop** (the whole screen in the middle of the frame, over a soft darkened copy of itself; the default) and **Fill the frame** (the screen covers everything, so most of its left and right sides are cropped off). One panel of the camera just fills the frame. In a two-panel clip of one screen and you, the screen is shown whole at full width and you fill the rest; otherwise the panels are equal. The small pictures of the two screens tell them apart.
   - **Trim the top** of the screens with the "Trim top" slider (0 to 30 percent). It cuts the macOS menu bar and a browser's address bar out of the screen panels, so a Story does not show `localhost:3002` or your tabs. It never touches the camera. To make it the starting value for every new capture, set `screenCropTop` in `config.json` (for example `0.08` for 8 percent).
   - Set a **Blur** (soft or heavy) on any panel on its own, to hide something. Only the finished clip is blurred; the raw recordings are never changed.
   - Switch **Me in black and white** (new captures start black and white; see the settings).
@@ -85,7 +85,7 @@ A day of captures is a few hundred MB. Deleting a capture frees all of it. (Phot
 | `everyMinutes` | how often it captures on its own (15) |
 | `seconds` | length of each clip (6) |
 | `warmupSeconds` | seconds thrown away at the start while the camera adjusts (1) |
-| `defaultPanels` | the panels a new capture starts with, top to bottom, two or three of `screen0`, `screen1`, `camera` (`["screen1", "camera"]`) |
+| `defaultPanels` | the panels a new capture starts with, top to bottom, one, two or three of `screen0`, `screen1`, `camera` (`["screen1", "camera"]`; use `["screen1"]` for one full-screen panel) |
 | `cameraName` | part of your camera's name (`FaceTime` for the built-in one) |
 | `screenCropTop` | how much to trim off the top of the screens for new captures, 0 to 0.4 (0 = none; try 0.08 to hide the address bar) |
 | `cameraBlackAndWhite` | new captures start with the camera in black and white (true) |
