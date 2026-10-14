@@ -1,6 +1,7 @@
 // ProcessLogMenu.swift — a button for the Mac's top menu bar, and a quiet corner reminder.
 //
 //   click        = capture now (the same as the big button on the page)
+//   next to it   = the time left until the next automatic capture (can be switched off in the menu)
 //   right-click  = a small menu: pause / resume, open the page, quit
 //   corner panel = after a capture, a small panel stays in a corner of the
 //                  main screen until you caption it or delete it. It hides itself while
@@ -147,9 +148,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var timer: Timer?
     let reminder = ReminderPanel()
 
+    // Whether the countdown shows beside the icon. Remembered between runs; on unless switched off.
+    var showCountdown: Bool {
+        get { UserDefaults.standard.object(forKey: "showCountdown") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "showCountdown"); draw() }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory) // no Dock icon
         if let button = statusItem.button {
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) // digits keep one width, so the countdown does not jitter
             button.target = self
             button.action = #selector(iconClicked)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -230,6 +238,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             tip = "Logging is paused. Click to capture now."
         }
 
+        // The time to the next automatic capture, beside the icon, while logging is on and nothing is recording.
+        // (An automatic capture stays quiet: no red icon, no countdown of its own.)
+        if showCountdown, serverReachable, let s = state, s.logging, !s.capturing, title.isEmpty {
+            title = " \(countdownText())"
+            tip = "Next automatic capture in \(countdownText()). Click to capture now. Right-click for the menu."
+        }
+
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Process Log")
         button.contentTintColor = tint
         button.title = title
@@ -280,6 +295,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if serverReachable {
             menu.addItem(item("Capture now", #selector(captureNowFromMenu)))
             menu.addItem(item(state?.logging == true ? "Pause logging" : "Resume logging", #selector(toggleLogging)))
+            let countdownItem = item("Show the countdown in the menu bar", #selector(toggleCountdown))
+            countdownItem.state = showCountdown ? .on : .off
+            menu.addItem(countdownItem)
         } else {
             menu.addItem(item("Start the Process Log", #selector(startServerFromMenu)))
         }
@@ -300,6 +318,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func captureNowFromMenu() { captureNow() }
     @objc func startServerFromMenu() { startServer() }
+    @objc func toggleCountdown() { showCountdown.toggle() }
     @objc func toggleLogging() {
         request("POST", "api/logging", body: ["on": !(state?.logging ?? true)]) { [weak self] in self?.poll() }
     }

@@ -62,7 +62,7 @@ It only logs while the Mac is awake and the Terminal window is open.
 
 ## The menu-bar button
 
-**Process Log Menu.app** puts a small icon in the Mac's top bar. **Click it to capture now.** **Right-click** (or Control-click) it for a menu: pause / resume, open the page, remove the button. If the Process Log is not running, clicking it starts it. Build it with `./build-menu-button.sh` (needs nothing extra; it uses the Swift that is already on the Mac), then double-click the app. It is made for you and signed by nobody: if macOS ever complains, right-click it and choose Open.
+**Process Log Menu.app** puts a small icon in the Mac's top bar. **Click it to capture now.** Beside the icon a small countdown (for example `12:34`) shows the time until the next automatic capture. It is hidden while logging is paused, and it stays out of the way during an automatic capture (that one is silent). A button capture shows its own red countdown. **Right-click** (or Control-click) the icon for a menu: pause / resume, **show the countdown in the menu bar** (tick it off if your menu bar is crowded), open the page, remove the button. If the Process Log is not running, clicking it starts it. Build it with `./build-menu-button.sh` (needs nothing extra; it uses the Swift that is already on the Mac), then double-click the app. It is made for you and signed by nobody: if macOS ever complains, right-click it and choose Open.
 
 ## Where things are kept
 
