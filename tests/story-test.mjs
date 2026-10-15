@@ -28,7 +28,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 const ff = (...args) => execFileSync(FFMPEG, ['-v', 'error', '-y', ...args], { stdio: 'pipe' })
 
 function streams(file) {
-  const out = execFileSync(FFPROBE, ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels,pix_fmt,duration', '-of', 'json', file], { encoding: 'utf8' })
+  const out = execFileSync(FFPROBE, ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels,pix_fmt,duration,start_time', '-of', 'json', file], { encoding: 'utf8' })
   const list = JSON.parse(out).streams
   return { video: list.find((s) => s.codec_type === 'video'), audio: list.find((s) => s.codec_type === 'audio') }
 }
@@ -105,6 +105,10 @@ await test('story clip: Instagram-ready video, the caption is on top, and a shor
   assert.equal(s.audio.channels, 2)
   assert.ok(Math.abs(seconds - 6) < 0.2)
   assert.ok(Math.abs(Number(s.audio.duration) - 6) < 0.3, `the sound should be padded to the clip length (got ${s.audio.duration})`)
+  // the picture and the sound both start at exactly 0 and end together, so nothing is shown as black at either end
+  assert.ok(Number(s.video.start_time) < 0.01, `the video must start at 0 (got ${s.video.start_time})`)
+  assert.ok(Number(s.audio.start_time) < 0.01, `the sound must start at 0 (got ${s.audio.start_time})`)
+  assert.ok(Math.abs(Number(s.video.duration) - Number(s.audio.duration)) < 0.1, 'picture and sound must be the same length')
   const [r, g, b] = pixelOf(file, 200, 150)
   assert.ok(r > 200 && g > 200 && b > 200, 'the caption box should be white on top of the clip')
   const [r2, g2, b2] = pixelOf(file, 900, 1500)

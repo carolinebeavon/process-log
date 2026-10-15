@@ -38,7 +38,9 @@ export function buildStoryArgs({ finalFile, captionFile, soundFile, seconds, out
   else args.push('-an')
   args.push(
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
-    '-r', '30', '-x264-params', 'open-gop=0', '-t', String(seconds),
+    // bframes=0: with B-frames and no edit list the video starts 0.067 s into the file, and Photos / Instagram
+    // fill that gap (and the end) with black. Without B-frames the clip starts at exactly 0.
+    '-r', '30', '-x264-params', 'open-gop=0:bframes=0', '-t', String(seconds),
     '-movflags', '+faststart', '-use_editlist', '0', '-map_chapters', '-1',
     outFile,
   )
